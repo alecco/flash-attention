@@ -98,12 +98,13 @@ __global__ void __launch_bounds__(Ktraits::kNWarps * cutlass::NumThreadsPerWarp,
     }
 
     static_assert(Ktraits::kNWarps == 12 || Ktraits::kNWarps == 16);
-    if (warp_group_idx == 0) {  // Producer
+    if (warp_group_idx == 0) {  // Producer warpgroup
         cutlass::arch::warpgroup_reg_dealloc<Ktraits::kNWarps == 12 ? 24 : 32>();
         // cutlass::arch::warpgroup_reg_dealloc<56>();
 
+        //                            comm all 32 threads           warp id      4 warps in warpgroup?
         int warp_idx_in_warpgroup = __shfl_sync(0xffffffff, (threadIdx.x / 32) % 4, 0);
-        if (warp_idx_in_warpgroup == 0) {  // Load Q, K, V
+        if (warp_idx_in_warpgroup == 0) {  // Load Q, K, V  - in warp 0 of warpgroup
             PipelineState smem_pipe_write_k = cutlass::make_producer_start_state<MainloopPipeline>();
             PipelineState smem_pipe_write_v = cutlass::make_producer_start_state<MainloopPipeline>();
 
@@ -135,7 +136,7 @@ __global__ void __launch_bounds__(Ktraits::kNWarps * cutlass::NumThreadsPerWarp,
             }
             collective_mainloop.load_tail(pipeline_k, pipeline_v, smem_pipe_write_k, smem_pipe_write_v);
         }
-    } else {  // Consumer
+    } else {  // Consumer warpgroup
         cutlass::arch::warpgroup_reg_alloc<Ktraits::kNWarps == 12 ? 240 : 160>();
         // cutlass::arch::warpgroup_reg_alloc<Ktraits::kNWarps == 12 ? 224 : 160>();
 
